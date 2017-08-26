@@ -1,26 +1,27 @@
 """Base entry models for Zinnia"""
+import os
+
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.text import Truncator
 from django.utils.html import strip_tags
-from django.utils.html import linebreaks
 from django.contrib.sites.models import Site
-from django.utils.functional import cached_property
-from django.contrib import comments
-from django.contrib.comments.models import CommentFlag
+from django.template.defaultfilters import slugify
 from django.utils.translation import ugettext_lazy as _
+from django.utils.encoding import python_2_unicode_compatible
 
-from django.contrib.markup.templatetags.markup import markdown
-from django.contrib.markup.templatetags.markup import textile
-from django.contrib.markup.templatetags.markup import restructuredtext
+import django_comments as comments
+from django_comments.models import CommentFlag
 
 from tagging.fields import TagField
 from tagging.utils import parse_tag_input
 
-from zinnia.flags import PINGBACK, TRACKBACK
+from zinnia.flags import PINGBACK
+from zinnia.flags import TRACKBACK
+from zinnia.markups import html_format
+from zinnia.preview import HTMLPreview
 from zinnia.settings import UPLOAD_TO
-from zinnia.settings import MARKUP_LANGUAGE
-from zinnia.settings import MARKDOWN_EXTENSIONS
 from zinnia.settings import ENTRY_DETAIL_TEMPLATES
 from zinnia.settings import ENTRY_CONTENT_TEMPLATES
 from zinnia.settings import AUTO_CLOSE_COMMENTS_AFTER
@@ -32,6 +33,7 @@ from zinnia.managers import DRAFT, HIDDEN, PUBLISHED
 from zinnia.url_shortener import get_url_shortener
 
 
+@python_2_unicode_compatible
 class CoreEntry(models.Model):
     """
     Abstract core entry model class providing
@@ -47,18 +49,26 @@ class CoreEntry(models.Model):
 
     slug = models.SlugField(
         _('slug'), max_length=255,
-        unique_for_date='creation_date',
+        unique_for_date='publication_date',
         help_text=_("Used to build the entry's URL."))
 
     status = models.IntegerField(
-        _('status'), choices=STATUS_CHOICES, default=DRAFT)
+        _('status'), db_index=True,
+        choices=STATUS_CHOICES, default=DRAFT)
+
+    publication_date = models.DateTimeField(
+        _('publication date'),
+        db_index=True, default=timezone.now,
+        help_text=_("Used to build the entry's URL."))
 
     start_publication = models.DateTimeField(
-        _('start publication'), blank=True, null=True,
+        _('start publication'),
+        db_index=True, blank=True, null=True,
         help_text=_('Start date of publication.'))
 
     end_publication = models.DateTimeField(
-        _('end publication'), blank=True, null=True,
+        _('end publication'),
+        db_index=True, blank=True, null=True,
         help_text=_('End date of publication.'))
 
     sites = models.ManyToManyField(
@@ -68,8 +78,8 @@ class CoreEntry(models.Model):
         help_text=_('Sites where the entry will be published.'))
 
     creation_date = models.DateTimeField(
-        _('creation date'), default=timezone.now,
-        help_text=_("Used to build the entry's URL."))
+        _('creation date'),
+        default=timezone.now)
 
     last_update = models.DateTimeField(
         _('last update'), default=timezone.now)
@@ -97,25 +107,49 @@ class CoreEntry(models.Model):
         """
         return self.is_actual and self.status == PUBLISHED
 
-    @cached_property
+    @property
     def previous_entry(self):
         """
         Returns the previous published entry if exists.
         """
-        entries = self.__class__.published.filter(
-            creation_date__lt=self.creation_date)[:1]
-        if entries:
-            return entries[0]
+        return self.previous_next_entries[0]
 
-    @cached_property
+    @property
     def next_entry(self):
         """
         Returns the next published entry if exists.
         """
-        entries = self.__class__.published.filter(
-            creation_date__gt=self.creation_date).order_by('creation_date')[:1]
-        if entries:
-            return entries[0]
+        return self.previous_next_entries[1]
+
+    @property
+    def previous_next_entries(self):
+        """
+        Returns and caches a tuple containing the next
+        and previous published entries.
+        Only available if the entry instance is published.
+        """
+        previous_next = getattr(self, 'previous_next', None)
+
+        if previous_next is None:
+            if not self.is_visible:
+                previous_next = (None, None)
+                setattr(self, 'previous_next', previous_next)
+                return previous_next
+
+            entries = list(self.__class__.published.all())
+            index = entries.index(self)
+            try:
+                previous = entries[index + 1]
+            except IndexError:
+                previous = None
+
+            if index:
+                next = entries[index - 1]
+            else:
+                next = None
+            previous_next = (previous, next)
+            setattr(self, 'previous_next', previous_next)
+        return previous_next
 
     @property
     def short_url(self):
@@ -124,33 +158,44 @@ class CoreEntry(models.Model):
         """
         return get_url_shortener()(self)
 
+    def save(self, *args, **kwargs):
+        """
+        Overrides the save method to update the
+        the last_update field.
+        """
+        self.last_update = timezone.now()
+        super(CoreEntry, self).save(*args, **kwargs)
+
     @models.permalink
     def get_absolute_url(self):
         """
         Builds and returns the entry's URL based on
         the slug and the creation date.
         """
-        creation_date = timezone.localtime(self.creation_date)
-        return ('zinnia_entry_detail', (), {
-            'year': creation_date.strftime('%Y'),
-            'month': creation_date.strftime('%m'),
-            'day': creation_date.strftime('%d'),
+        publication_date = self.publication_date
+        if timezone.is_aware(publication_date):
+            publication_date = timezone.localtime(publication_date)
+        return ('zinnia:entry_detail', (), {
+            'year': publication_date.strftime('%Y'),
+            'month': publication_date.strftime('%m'),
+            'day': publication_date.strftime('%d'),
             'slug': self.slug})
 
-    def __unicode__(self):
-        return u'%s: %s' % (self.title, self.get_status_display())
+    def __str__(self):
+        return '%s: %s' % (self.title, self.get_status_display())
 
     class Meta:
         """
         CoreEntry's meta informations.
         """
         abstract = True
-        app_label = 'zinnia'
-        ordering = ['-creation_date']
-        get_latest_by = 'creation_date'
+        ordering = ['-publication_date']
+        get_latest_by = 'publication_date'
         verbose_name = _('entry')
         verbose_name_plural = _('entries')
-        index_together = [['slug', 'creation_date']]
+        index_together = [['slug', 'publication_date'],
+                          ['status', 'publication_date',
+                           'start_publication', 'end_publication']]
         permissions = (('can_view_all', 'Can view all entries'),
                        ('can_change_status', 'Can change status'),
                        ('can_change_author', 'Can change author(s)'), )
@@ -168,15 +213,16 @@ class ContentEntry(models.Model):
         """
         Returns the "content" field formatted in HTML.
         """
-        if MARKUP_LANGUAGE == 'markdown':
-            return markdown(self.content, MARKDOWN_EXTENSIONS)
-        elif MARKUP_LANGUAGE == 'textile':
-            return textile(self.content)
-        elif MARKUP_LANGUAGE == 'restructuredtext':
-            return restructuredtext(self.content)
-        elif not '</p>' in self.content:
-            return linebreaks(self.content)
-        return self.content
+        return html_format(self.content)
+
+    @property
+    def html_preview(self):
+        """
+        Returns a preview of the "content" field or
+        the "lead" field if defined, formatted in HTML.
+        """
+        return HTMLPreview(self.html_content,
+                           getattr(self, 'html_lead', ''))
 
     @property
     def word_count(self):
@@ -248,10 +294,10 @@ class DiscussionsEntry(models.Model):
         are a certain number of days.
         """
         discussion_enabled = getattr(self, discussion_type)
-        if (discussion_enabled and isinstance(auto_close_after, int)
-                and auto_close_after >= 0):
+        if (discussion_enabled and isinstance(auto_close_after, int) and
+                auto_close_after >= 0):
             return (timezone.now() - (
-                self.start_publication or self.creation_date)).days < \
+                self.start_publication or self.publication_date)).days < \
                 auto_close_after
         return discussion_enabled
 
@@ -293,7 +339,7 @@ class RelatedEntry(models.Model):
     """
     related = models.ManyToManyField(
         'self',
-        blank=True, null=True,
+        blank=True,
         verbose_name=_('related entries'))
 
     @property
@@ -307,25 +353,83 @@ class RelatedEntry(models.Model):
         abstract = True
 
 
+class LeadEntry(models.Model):
+    """
+    Abstract model class providing a lead content to the entries.
+    """
+    lead = models.TextField(
+        _('lead'), blank=True,
+        help_text=_('Lead paragraph'))
+
+    @property
+    def html_lead(self):
+        """
+        Returns the "lead" field formatted in HTML.
+        """
+        return html_format(self.lead)
+
+    class Meta:
+        abstract = True
+
+
 class ExcerptEntry(models.Model):
     """
     Abstract model class to add an excerpt to the entries.
     """
     excerpt = models.TextField(
         _('excerpt'), blank=True,
-        help_text=_('Optional element.'))
+        help_text=_('Used for SEO purposes.'))
+
+    def save(self, *args, **kwargs):
+        """
+        Overrides the save method to create an excerpt
+        from the content field if void.
+        """
+        if not self.excerpt and self.status == PUBLISHED:
+            self.excerpt = Truncator(strip_tags(
+                getattr(self, 'content', ''))).words(50)
+        super(ExcerptEntry, self).save(*args, **kwargs)
 
     class Meta:
         abstract = True
 
 
+def image_upload_to_dispatcher(entry, filename):
+    """
+    Dispatch function to allow overriding of ``image_upload_to`` method.
+
+    Outside the model for fixing an issue with Django's migrations on Python 2.
+    """
+    return entry.image_upload_to(filename)
+
+
 class ImageEntry(models.Model):
     """
-    Abstract model class to add an image to the entries.
+    Abstract model class to add an image for illustrating the entries.
     """
+
+    def image_upload_to(self, filename):
+        """
+        Compute the upload path for the image field.
+        """
+        now = timezone.now()
+        filename, extension = os.path.splitext(filename)
+
+        return os.path.join(
+            UPLOAD_TO,
+            now.strftime('%Y'),
+            now.strftime('%m'),
+            now.strftime('%d'),
+            '%s%s' % (slugify(filename), extension))
+
     image = models.ImageField(
-        _('image'), blank=True, upload_to=UPLOAD_TO,
+        _('image'), blank=True,
+        upload_to=image_upload_to_dispatcher,
         help_text=_('Used for illustration.'))
+
+    image_caption = models.TextField(
+        _('caption'), blank=True,
+        help_text=_("Image's caption."))
 
     class Meta:
         abstract = True
@@ -349,8 +453,8 @@ class AuthorsEntry(models.Model):
     """
     authors = models.ManyToManyField(
         'zinnia.Author',
+        blank=True,
         related_name='entries',
-        blank=True, null=False,
         verbose_name=_('authors'))
 
     class Meta:
@@ -363,8 +467,8 @@ class CategoriesEntry(models.Model):
     """
     categories = models.ManyToManyField(
         'zinnia.Category',
+        blank=True,
         related_name='entries',
-        blank=True, null=True,
         verbose_name=_('categories'))
 
     class Meta:
@@ -373,7 +477,7 @@ class CategoriesEntry(models.Model):
 
 class TagsEntry(models.Model):
     """
-    Abstract lodel class to add tags to the entries.
+    Abstract model class to add tags to the entries.
     """
     tags = TagField(_('tags'))
 
@@ -451,6 +555,7 @@ class AbstractEntry(
         ContentEntry,
         DiscussionsEntry,
         RelatedEntry,
+        LeadEntry,
         ExcerptEntry,
         ImageEntry,
         FeaturedEntry,

@@ -24,7 +24,7 @@ Entry
 
 ZINNIA_ENTRY_BASE_MODEL
 -----------------------
-**Default value:** ``''`` (Empty string)
+**Default value:** ``'zinnia.models_bases.entry.AbstractEntry'`` (Empty string)
 
 String defining the base model path for the Entry model. See
 :doc:`/how-to/extending_entry_model` for more informations.
@@ -33,29 +33,46 @@ String defining the base model path for the Entry model. See
 
 ZINNIA_ENTRY_DETAIL_TEMPLATES
 -----------------------------
-**Default value:** ``()`` (Empty tuple)
+**Default value:** ``[]`` (Empty list)
 
 List of tuple for extending the list of templates availables for
 rendering the entry detail view. By using this setting, you can
 change the look and feel of an entry page directly in the admin
 interface. Example: ::
 
-  ZINNIA_ENTRY_DETAIL_TEMPLATES = (('entry_detail_alternate.html',
-                                    gettext('Alternative template')),)
+  ZINNIA_ENTRY_DETAIL_TEMPLATES = [('entry_detail_alternate.html',
+                                    gettext('Alternative template')),]
 
 .. setting:: ZINNIA_ENTRY_CONTENT_TEMPLATES
 
 ZINNIA_ENTRY_CONTENT_TEMPLATES
 ------------------------------
-**Default value:** ``()`` (Empty tuple)
+**Default value:** ``[]`` (Empty list)
 
 List of tuple for extending the list of templates availables for
 rendering the content of an entry. By using this setting, you can
 change the look and feel of an entry directly in the admin
 interface. Example: ::
 
-  ZINNIA_ENTRY_CONTENT_TEMPLATES = (('zinnia/_entry_detail_alternate.html',
-                                     gettext('Alternative template')),)
+  ZINNIA_ENTRY_CONTENT_TEMPLATES = [('zinnia/_entry_detail_alternate.html',
+                                     gettext('Alternative template')),]
+
+.. setting:: ZINNIA_ENTRY_LOOP_TEMPLATES
+
+ZINNIA_ENTRY_LOOP_TEMPLATES
+---------------------------
+**Default value:** ``{'default': {}}``
+
+Dictionary of dictionaries of indexes for by-passing the template used when
+rendering an entry within a loop of filtered entries. By using this
+setting, you can change with Python code, the look and feel of an entry
+within a specific loop. Example: ::
+
+  ZINNIA_ENTRY_LOOP_TEMPLATES = {
+      'default': {1: 'zinnia/_entry_detail_first.html'},
+      'author-admin': dict([(i, 'zinnia/_entry_detail_admin.html')
+                            for i in range(1000) if not i % 5])
+  }
 
 .. setting:: ZINNIA_UPLOAD_TO
 
@@ -85,46 +102,64 @@ You can use one of these values: ::
 
     ['html', 'markdown', 'restructuredtext', 'textile']
 
-The value of this variable will alter the value of :setting:`ZINNIA_WYSIWYG`
-if you don't set it.
-
 .. setting:: ZINNIA_MARKDOWN_EXTENSIONS
 
 ZINNIA_MARKDOWN_EXTENSIONS
 --------------------------
-**Default value:** ``''`` (Empty string)
+**Default value:** ``[]`` (Empty list)
 
-Extensions names to be used for rendering the entries in MarkDown. Example:
-::
+List of either markdown.Extension instances or extension paths, used for
+rendering the entries in MarkDown. Example: ::
 
-  ZINNIA_MARKDOWN_EXTENSIONS = 'extension1_name,extension2_name...'
+  ZINNIA_MARKDOWN_EXTENSIONS =  ['markdown.extensions.nl2br',
+                                 MyExtension(mysetting="foo")]
 
-.. setting:: ZINNIA_WYSIWYG
+.. setting:: ZINNIA_RESTRUCTUREDTEXT_SETTINGS
 
-ZINNIA_WYSIWYG
---------------
-**Default value:** ::
+ZINNIA_RESTRUCTUREDTEXT_SETTINGS
+--------------------------------
+**Default value:** ``{}`` (Empty dict)
 
-    WYSIWYG_MARKUP_MAPPING = {
-        'textile': 'markitup',
-        'markdown': 'markitup',
-        'restructuredtext': 'markitup',
-        'html': 'tinymce' in settings.INSTALLED_APPS and \
-                    'tinymce' or 'wymeditor'}
+A dictionary containing settings for the RestructuredText markup
+processing. See the Docutils restructuredtext `writer settings docs
+<http://docutils.sourceforge.net/docs/user/config.html#html4css1-writer>`_
+for details.
 
-    WYSIWYG = getattr(settings, 'ZINNIA_WYSIWYG',
-                      WYSIWYG_MARKUP_MAPPING.get(ZINNIA_MARKUP_LANGUAGE))
+.. _settings-preview:
 
-Determining the WYSIWYG editor used for editing an entry.
-So if MarkDown, Textile or reStructuredText are used, the value will be
-``'markitup'``, but if you use HTML, TinyMCE will be used if
-:ref:`django-tinymce is installed<zinnia-tinymce>`, else WYMEditor will be
-used.
+Preview
+=======
 
-This setting can also be used for disabling the WYSIWYG
-functionnality. Example: ::
+.. setting:: ZINNIA_PREVIEW_SPLITTERS
 
-  ZINNIA_WYSIWYG = None
+ZINNIA_PREVIEW_SPLITTERS
+------------------------
+
+**Default value:** ``['<!-- more -->', '<!--more-->'])``
+
+List of split markers used to make a preview of the entry's content if
+present in the HTML. All the content before the marker will be used to
+build the preview of the entry.
+
+.. setting:: ZINNIA_PREVIEW_MAX_WORDS
+
+ZINNIA_PREVIEW_MAX_WORDS
+------------------------
+
+**Default value:** ``55``
+
+Number of words used to build the entry's preview if no split markers are
+found.
+
+.. setting:: ZINNIA_PREVIEW_MORE_STRING
+
+ZINNIA_PREVIEW_MORE_STRING
+--------------------------
+
+**Default value:** ``' ...'``
+
+The string to be appended to the content when a truncation for the preview
+is done.
 
 .. _settings-views:
 
@@ -225,8 +260,8 @@ ZINNIA_AUTO_MODERATE_COMMENTS
 -----------------------------
 **Default value:** ``False``
 
-Determine if a new comment should be allowed to show up
-immediately or should be marked non-public and await approval.
+Determine if a new comment should be marked non-public and await approval.
+Leave as ``False`` to allow comments to show up immediately.
 
 .. setting:: ZINNIA_AUTO_CLOSE_COMMENTS_AFTER
 
@@ -273,7 +308,7 @@ new public comment has been posted.
 
 ZINNIA_SPAM_CHECKER_BACKENDS
 ----------------------------
-**Default value:** ``()`` (Empty tuple)
+**Default value:** ``[]`` (Empty list)
 
 List of strings representing the module path to a spam checker backend.
 See :doc:`/topics/spam_checker` for more informations about this setting.
@@ -365,27 +400,6 @@ ZINNIA_PINGBACK_CONTENT_LENGTH
 
 Size of the excerpt generated on pingback.
 
-.. _settings-similarity:
-
-Similarity
-==========
-
-.. setting:: ZINNIA_F_MIN
-
-ZINNIA_F_MIN
-------------
-**Default value:** ``0.1``
-
-Float setting of the minimal word frequency for similar entries.
-
-.. setting:: ZINNIA_F_MAX
-
-ZINNIA_F_MAX
-------------
-**Default value:** ``1.0``
-
-Float setting of the minimal word frequency for similar entries.
-
 .. _settings-misc:
 
 Miscellaneous
@@ -400,20 +414,18 @@ ZINNIA_COPYRIGHT
 String used for copyrighting your entries, used in the syndication feeds
 and in the opensearch document.
 
-.. setting:: ZINNIA_STOP_WORDS
+.. setting:: ZINNIA_COMPARISON_FIELDS
 
-ZINNIA_STOP_WORDS
------------------
-**Default value:** See :file:`zinnia/settings.py`
+ZINNIA_COMPARISON_FIELDS
+------------------------
+**Default value:** ``['title', 'lead', 'content', 'excerpt', 'image_caption', 'tags']``
 
-List of common words excluded from the advanced search engine
-to optimize the search querying and the results.
+List of text fields used to find similarity between entries.
 
-.. setting:: ZINNIA_USE_TWITTER
+.. setting:: ZINNIA_SEARCH_FIELDS
 
-ZINNIA_USE_TWITTER
-------------------
-**Default value:** ``True if the crendentials of Twitter have been defined``
+ZINNIA_SEARCH_FIELDS
+--------------------
+**Default value:** ``['title', 'lead', 'content', 'excerpt', 'image_caption', 'tags']``
 
-Boolean telling if the credentials of a Twitter account have been set and
-if Zinnia can post on Twitter.
+List of text fields used to search within entries.

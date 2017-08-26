@@ -75,6 +75,7 @@ class EntryWeek(EntryArchiveMixin, BaseWeekArchiveView):
         """
         self.date_list, self.object_list, extra_context = super(
             EntryWeek, self).get_dated_items()
+        self.date_list = self.get_date_list(self.object_list, 'day')
         extra_context['week_end_day'] = extra_context[
             'week'] + datetime.timedelta(days=6)
         return self.date_list, self.object_list, extra_context
@@ -99,6 +100,9 @@ class EntryToday(EntryArchiveMixin, BaseTodayArchiveView):
         And defines self.year/month/day for
         EntryQuerysetArchiveTemplateResponseMixin.
         """
-        today = timezone.localtime(timezone.now()).date()
+        now = timezone.now()
+        if timezone.is_aware(now):
+            now = timezone.localtime(now)
+        today = now.date()
         self.year, self.month, self.day = today.isoformat().split('-')
         return self._get_dated_items(today)

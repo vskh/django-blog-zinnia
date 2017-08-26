@@ -38,9 +38,10 @@ reproduction...). That's why Zinnia provides a third generic solution.
 
 The extension process is done in three main steps:
 
-#. Write a class containing your customizations.
-#. Register your class into Zinnia to be used.
-#. Update the :class:`~zinnia.admin.entry.EntryAdmin` class accordingly.
+#. Write a model class containing your customizations.
+#. Register your model class into Zinnia to be used.
+#. Create and register a new :class:`~django.contrib.admin.ModelAdmin`
+   class for your new model class.
 
 .. _writing-model-extension:
 
@@ -77,8 +78,8 @@ the :class:`Entry` model in :file:`models.py`. ::
   class EntryGallery(AbstractEntry):
       gallery = models.ForeignKey(Gallery)
 
-      def __unicode__(self):
-          return u'EntryGallery %s' % self.title
+      def __str__(self):
+          return 'EntryGallery %s' % self.title
 
       class Meta(AbstractEntry.Meta):
           abstract = True
@@ -145,8 +146,8 @@ take advantage of all the abstracts classes provided to build the
       image = models.ForeignKey(Picture)
       gallery = models.ForeignKey(Gallery)
 
-      def __unicode__(self):
-          return u'EntryGallery %s' % self.title
+      def __str__(self):
+          return 'EntryGallery %s' % self.title
 
       class Meta(entry.CoreEntry.Meta):
           abstract = True
@@ -162,27 +163,23 @@ Note that the same process apply if you want to delete some built-in fields.
 Considerations about the database
 =================================
 
-If you do the extension of the :class:`Entry` model after the ``syncdb``
-command, you have to manually alter the Zinnia's tables for reflecting your
-changes made on the model class. In the case where your database is empty,
-you can simply execute the ``reset`` command on the Zinnia application for
-destroying the old database schema and installing the new one.
+If you do the extension of the :class:`Entry` model, you have to alter the
+Zinnia's database tables for reflecting your changes made on the model
+class.
 
-Now if you are using `South`_ and try to write a new migration for
-reflecting your changes, the migration script will be written in the
+Fortunately since Django 1.7 you just have to write a new migration for
+reflecting your changes, but the migration script will be written in the
 :mod:`zinnia.migrations` module, which is not recommended because the
 result is not replicable for multiple installations and breaks the
 migration system with future releases of Zinnia.
 
-Fortunatly `South`_ provides an elegant solution with the
-`SOUTH_MIGRATION_MODULES`_ setting. Once this setting done for the
-``'zinnia'`` key, because you are now out the Zinnia's default migrations
-flow, you have to delete the ghost migrations for Zinnia. At this step you
-can now start to write new migrations.
+Fortunatly Django provides a solution with the :setting:`MIGRATION_MODULES`
+setting. Once this setting done for the ``'zinnia'`` key, can now start to
+write new migrations.
 
-It's recommended that the new initial migration represents the default
+It's recommended that the new **initial** migration represents the default
 :class:`Entry` schema provided by Zinnia, because after that, you just have
-to write a new migration for reflecting your changes, and you can alter
+to write a new migration for reflecting your changes, and you just alter
 your database schema with the ``migrate`` command.
 
 .. _registering-the-extension:
@@ -208,12 +205,12 @@ and the :class:`EntryAbstractClass` will be used.
 Updating the admin interface
 ============================
 
-Now we should update the :class:`Entry`'s admin class to reflect our
-changes and use the new fields.
+Now we should create a new :class:`~zinnia.admin.entry.EntryAdmin` admin
+class to reflect our changes and use the new fields.
 
 To do that we will write a new admin class inherited from
-:class:`~zinnia.admin.entry.EntryAdmin` and use the admin site
-register/unregister mechanism for using our new class.
+:class:`~zinnia.admin.entry.EntryAdmin` and register it within the admin
+site.
 
 In the file :file:`zinnia_gallery/admin.py` we can write these code lines
 for adding the gallery field: ::
@@ -227,19 +224,18 @@ for adding the gallery field: ::
   class EntryGalleryAdmin(EntryAdmin):
     # In our case we put the gallery field
     # into the 'Content' fieldset
-    fieldsets = ((_('Content'), {'fields': (
-      'title', 'content', 'image', 'status', 'gallery')}),) + \
-      EntryAdmin.fieldsets[1:]
+    fieldsets = (
+      (_('Content'), {
+        'fields': (('title', 'status'), 'lead', 'content',)}),
+      (_('Illustration'), {
+        'fields': ('image', 'gallery'),
+        'classes': ('collapse', 'collapse-closed')}),) + \
+      EntryAdmin.fieldsets[2:]
 
-  # Unregister the default EntryAdmin
-  # then register the EntryGalleryAdmin class
-  admin.site.unregister(Entry)
   admin.site.register(Entry, EntryGalleryAdmin)
 
-
-Note that the :mod:`zinnia_gallery` application must be registered in the
-:setting:`INSTALLED_APPS` setting after the :mod:`zinnia` application for
-applying the register/unregister mechanism in the admin site.
+Templating
+==========
 
 Now we can easily
 :doc:`customize the templates</how-to/customize_look_and_feel>`
@@ -248,6 +244,4 @@ provided by Zinnia to display the gallery field into the Weblog's pages.
 For more information you can see another implementation example in the
 `cmsplugin-zinnia`_ package.
 
-.. _`South`: http://south.aeracode.org/
-.. _`SOUTH_MIGRATION_MODULES`: http://south.readthedocs.org/en/latest/settings.html#south-migration-modules
-.. _`cmsplugin-zinnia`: https://github.com/Fantomas42/cmsplugin-zinnia
+.. _`cmsplugin-zinnia`: https://github.com/django-blog-zinnia/cmsplugin-zinnia

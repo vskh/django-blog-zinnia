@@ -1,6 +1,9 @@
 """Settings of Zinnia"""
 from django.conf import settings
 
+from mots_vides import stop_words
+
+
 PING_DIRECTORIES = getattr(settings, 'ZINNIA_PING_DIRECTORIES',
                            ('http://django-blog-zinnia.com/xmlrpc/',))
 SAVE_PING_DIRECTORIES = getattr(settings, 'ZINNIA_SAVE_PING_DIRECTORIES',
@@ -15,24 +18,30 @@ PAGINATION = getattr(settings, 'ZINNIA_PAGINATION', 10)
 ALLOW_EMPTY = getattr(settings, 'ZINNIA_ALLOW_EMPTY', True)
 ALLOW_FUTURE = getattr(settings, 'ZINNIA_ALLOW_FUTURE', True)
 
-ENTRY_BASE_MODEL = getattr(settings, 'ZINNIA_ENTRY_BASE_MODEL', '')
+ENTRY_BASE_MODEL = getattr(settings, 'ZINNIA_ENTRY_BASE_MODEL',
+                           'zinnia.models_bases.entry.AbstractEntry')
+
 ENTRY_DETAIL_TEMPLATES = getattr(
     settings, 'ZINNIA_ENTRY_DETAIL_TEMPLATES', [])
 ENTRY_CONTENT_TEMPLATES = getattr(
     settings, 'ZINNIA_ENTRY_CONTENT_TEMPLATES', [])
+ENTRY_LOOP_TEMPLATES = getattr(
+    settings, 'ZINNIA_ENTRY_LOOP_TEMPLATES', {})
+ENTRY_LOOP_TEMPLATES.setdefault('default', {})
 
 MARKUP_LANGUAGE = getattr(settings, 'ZINNIA_MARKUP_LANGUAGE', 'html')
 
-MARKDOWN_EXTENSIONS = getattr(settings, 'ZINNIA_MARKDOWN_EXTENSIONS', '')
+MARKDOWN_EXTENSIONS = getattr(settings, 'ZINNIA_MARKDOWN_EXTENSIONS', [])
 
-WYSIWYG_MARKUP_MAPPING = {
-    'textile': 'markitup',
-    'markdown': 'markitup',
-    'restructuredtext': 'markitup',
-    'html': 'tinymce' in settings.INSTALLED_APPS and 'tinymce' or 'wymeditor'}
+RESTRUCTUREDTEXT_SETTINGS = getattr(
+    settings, 'ZINNIA_RESTRUCTUREDTEXT_SETTINGS', {})
 
-WYSIWYG = getattr(settings, 'ZINNIA_WYSIWYG',
-                  WYSIWYG_MARKUP_MAPPING.get(MARKUP_LANGUAGE))
+PREVIEW_SPLITTERS = getattr(settings, 'ZINNIA_PREVIEW_SPLITTERS',
+                            ['<!-- more -->', '<!--more-->'])
+
+PREVIEW_MAX_WORDS = getattr(settings, 'ZINNIA_PREVIEW_MAX_WORDS', 55)
+
+PREVIEW_MORE_STRING = getattr(settings, 'ZINNIA_PREVIEW_MORE_STRING', ' ...')
 
 AUTO_CLOSE_PINGBACKS_AFTER = getattr(
     settings, 'ZINNIA_AUTO_CLOSE_PINGBACKS_AFTER', None)
@@ -68,36 +77,18 @@ FEEDS_MAX_ITEMS = getattr(settings, 'ZINNIA_FEEDS_MAX_ITEMS', 15)
 PINGBACK_CONTENT_LENGTH = getattr(settings,
                                   'ZINNIA_PINGBACK_CONTENT_LENGTH', 300)
 
-F_MIN = getattr(settings, 'ZINNIA_F_MIN', 0.1)
-F_MAX = getattr(settings, 'ZINNIA_F_MAX', 1.0)
+SEARCH_FIELDS = getattr(settings, 'ZINNIA_SEARCH_FIELDS',
+                        ['title', 'lead', 'content',
+                         'excerpt', 'image_caption', 'tags'])
+
+COMPARISON_FIELDS = getattr(settings, 'ZINNIA_COMPARISON_FIELDS',
+                            ['title', 'lead', 'content',
+                             'excerpt', 'image_caption', 'tags'])
 
 SPAM_CHECKER_BACKENDS = getattr(settings, 'ZINNIA_SPAM_CHECKER_BACKENDS',
-                                ())
+                                [])
 
 URL_SHORTENER_BACKEND = getattr(settings, 'ZINNIA_URL_SHORTENER_BACKEND',
                                 'zinnia.url_shortener.backends.default')
 
-STOP_WORDS = getattr(settings, 'ZINNIA_STOP_WORDS',
-                     ('able', 'about', 'across', 'after', 'all', 'almost',
-                      'also', 'among', 'and', 'any', 'are', 'because', 'been',
-                      'but', 'can', 'cannot', 'could', 'dear', 'did', 'does',
-                      'either', 'else', 'ever', 'every', 'for', 'from', 'get',
-                      'got', 'had', 'has', 'have', 'her', 'hers', 'him', 'his',
-                      'how', 'however', 'into', 'its', 'just', 'least', 'let',
-                      'like', 'likely', 'may', 'might', 'most', 'must',
-                      'neither', 'nor', 'not', 'off', 'often', 'only', 'other',
-                      'our', 'own', 'rather', 'said', 'say', 'says', 'she',
-                      'should', 'since', 'some', 'than', 'that', 'the',
-                      'their', 'them', 'then', 'there', 'these', 'they',
-                      'this', 'tis', 'too', 'twas', 'wants', 'was', 'were',
-                      'what', 'when', 'where', 'which', 'while', 'who', 'whom',
-                      'why', 'will', 'with', 'would', 'yet', 'you', 'your'))
-
-TWITTER_CONSUMER_KEY = getattr(settings, 'TWITTER_CONSUMER_KEY', '')
-TWITTER_CONSUMER_SECRET = getattr(settings, 'TWITTER_CONSUMER_SECRET', '')
-TWITTER_ACCESS_KEY = getattr(settings, 'TWITTER_ACCESS_KEY', '')
-TWITTER_ACCESS_SECRET = getattr(settings, 'TWITTER_ACCESS_SECRET', '')
-
-USE_TWITTER = getattr(settings, 'ZINNIA_USE_TWITTER',
-                      bool(TWITTER_ACCESS_KEY and TWITTER_ACCESS_SECRET and
-                           TWITTER_CONSUMER_KEY and TWITTER_CONSUMER_SECRET))
+STOP_WORDS = stop_words(settings.LANGUAGE_CODE.split('-')[0])

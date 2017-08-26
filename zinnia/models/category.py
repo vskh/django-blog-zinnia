@@ -1,6 +1,7 @@
 """Category model for Zinnia"""
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
+from django.utils.encoding import python_2_unicode_compatible
 
 from mptt.models import MPTTModel
 from mptt.models import TreeForeignKey
@@ -10,6 +11,7 @@ from zinnia.managers import entries_published
 from zinnia.managers import EntryRelatedPublishedManager
 
 
+@python_2_unicode_compatible
 class Category(MPTTModel):
     """
     Simple model for categorizing entries.
@@ -29,6 +31,7 @@ class Category(MPTTModel):
         'self',
         related_name='children',
         null=True, blank=True,
+        on_delete=models.SET_NULL,
         verbose_name=_('parent category'))
 
     objects = TreeManager()
@@ -58,16 +61,15 @@ class Category(MPTTModel):
         Builds and returns the category's URL
         based on his tree path.
         """
-        return ('zinnia_category_detail', (self.tree_path,))
+        return ('zinnia:category_detail', (self.tree_path,))
 
-    def __unicode__(self):
+    def __str__(self):
         return self.title
 
     class Meta:
         """
         Category's meta informations.
         """
-        app_label = 'zinnia'
         ordering = ['title']
         verbose_name = _('category')
         verbose_name_plural = _('categories')

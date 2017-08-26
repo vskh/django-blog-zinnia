@@ -20,9 +20,9 @@ create some **widgets** in your Web site's templates.
 To start using any of the following template tags you need to load them
 first at the top of your template: ::
 
-  {% load zinnia_tags %}
+  {% load zinnia %}
 
-.. module:: zinnia.templatetags.zinnia_tags
+.. module:: zinnia.templatetags.zinnia
 
 .. templatetag:: get_recent_entries
 
@@ -59,7 +59,7 @@ Usage examples: ::
 .. templatetag:: get_draft_entries
 
 get_draft_entries
-====================
+=================
 
 Display the latest entries marked as draft.
 
@@ -308,6 +308,23 @@ Usage examples: ::
   {% zinnia_breadcrumbs "News" "custom_template.html" %}
   {% zinnia_breadcrumbs template="custom_template.html" %}
 
+.. templatetag:: zinnia_loop_template
+
+zinnia_loop_template
+====================
+
+Store in a context variable a :class:`~django.template.base.Template`
+choosen from his position whithin a loop of entries.
+
+.. autofunction:: zinnia_loop_template
+
+Usage example: ::
+
+  {% for object in object_list %}
+    {% zinnia_loop_template "my-template.html" as template %}
+    {% include template %}
+  {% endfor %}
+
 .. templatetag:: zinnia_statistics
 
 zinnia_statistics
@@ -340,3 +357,56 @@ Usage examples: ::
   {% get_gravatar user.email 50 "PG" "identicon" "https" %}
   {% get_gravatar user.email rating="PG" protocol="https" %}
 
+.. templatefilter:: widont
+
+widont
+======
+
+Insert a non-breaking space between the last two words of your sentence.
+
+.. autofunction:: widont
+
+Usage example: ::
+
+  {{ variable|widont }}
+
+.. templatefilter:: week_number
+
+week_number
+===========
+
+Return the Python week number of a date.
+
+.. autofunction:: week_number
+
+Usage example: ::
+
+  {{ date_variable|week_number }}
+
+.. templatefilter:: comment_admin_urlname
+
+comment_admin_urlname
+=====================
+
+Return an admin URL for managing the comments, whatever the the application
+used.
+
+.. autofunction:: comment_admin_urlname
+
+Usage example: ::
+
+  {% url 'changelist'|comment_admin_urlname %}
+
+.. templatefilter:: user_admin_urlname
+
+user_admin_urlname
+=====================
+
+Return an admin URL for managing the users, whatever the the application
+used.
+
+.. autofunction:: user_admin_urlname
+
+Usage example: ::
+
+  {% url 'changelist'|user_admin_urlname %}

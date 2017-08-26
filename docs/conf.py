@@ -10,7 +10,6 @@
 #
 # All configuration values have a default; values that are commented out
 # serve to show the default.
-
 import os
 import sys
 import re
@@ -22,8 +21,10 @@ sys.path.append(HERE)
 sys.path.append(os.path.join(HERE, '..'))
 os.environ['DJANGO_SETTINGS_MODULE'] = 'extensions.settings'
 
+import django
 from django.core.management import call_command
-call_command('syncdb', verbosity=0, interactive=False)
+django.setup()
+call_command('migrate', verbosity=0, interactive=False)
 
 import zinnia
 
@@ -55,8 +56,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Django Blog Zinnia'
-copyright = u'%s, %s' % (date.today().year, zinnia.__author__)
+project = 'Django Blog Zinnia'
+copyright = '%s, %s' % (date.today().year, zinnia.__author__)
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -108,41 +109,16 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'default'
+# on_rtd is whether we are on readthedocs.org
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
-# For using default theme on RTFD
-html_style = 'default.css'
-
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
-text_color = '#33333'
-link_color = '#0066AA'
-box_color = '#e9e9f3'
-background_color = '#FFF'
-text_font = "Arial, Helvetica, sans-serif"
-
-html_theme_options = {
-    'footerbgcolor': background_color,
-    'footertextcolor': text_color,
-    'sidebarbgcolor': background_color,
-    'sidebartextcolor': text_color,
-    'sidebarlinkcolor': link_color,
-    'relbarbgcolor': background_color,
-    'relbartextcolor': text_color,
-    'relbarlinkcolor': link_color,
-    'bgcolor': background_color,
-    'textcolor': text_color,
-    'linkcolor': link_color,
-    'visitedlinkcolor': link_color,
-    'headbgcolor': box_color,
-    'headtextcolor': link_color,
-    'headlinkcolor': link_color,
-    'codebgcolor': box_color,
-    'bodyfont': text_font,
-    'headfont': text_font,
-    'sidebarwidth': 210,
-}
+if not on_rtd:  # only import and set the theme if we're building docs locally
+    try:
+        import sphinx_rtd_theme
+        html_theme = 'sphinx_rtd_theme'
+        html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+    except:
+        html_theme = 'default'
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = []
@@ -156,12 +132,12 @@ html_theme_options = {
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = 'logo.png'
+html_logo = 'static/logo.png'
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-html_favicon = 'favicon.ico'
+html_favicon = 'static/favicon.ico'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -224,8 +200,8 @@ htmlhelp_basename = 'django-blog-zinniadoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'django-blog-zinnia.tex', u'django-blog-zinnia Documentation',
-   u'Fantomas42', 'manual'),
+  ('index', 'django-blog-zinnia.tex', 'django-blog-zinnia Documentation',
+   'Fantomas42', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -257,6 +233,6 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'django-blog-zinnia', u'django-blog-zinnia Documentation',
-     [u'Fantomas42'], 1)
+    ('index', 'django-blog-zinnia', 'django-blog-zinnia Documentation',
+     ['Fantomas42'], 1)
 ]
